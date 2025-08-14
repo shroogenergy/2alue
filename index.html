@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini‑AGI — Offline Edition (No Keys, No Network)</title>
+  <style>
+    :root{--bg:#0f1220;--panel:#151935;--muted:#8a92b2;--text:#eef1ff;--accent:#6ae3ff;--accent2:#a0e8af;--danger:#ff6b6b;--radius:18px;--gap:14px}
+    *{box-sizing:border-box} html,body{height:100%} body{margin:0;background:linear-gradient(180deg,#0c0f1d,#0f1220 40%,#0f1220);color:var(--text);font:15px/1.6 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .container{max-width:1160px;margin-inline:auto;padding:22px}
+    header{display:flex;gap:var(--gap);align-items:center;justify-content:space-between;margin-bottom:18px}
+    .title{display:flex;align-items:center;gap:10px}
+    .title h1{margin:0;font-size:22px;font-weight:700}
+    .beta{padding:2px 8px;border-radius:999px;background:#1e2345;color:var(--muted);font-size:12px}
+    .toolbar{display:grid;grid-template-columns:1fr auto auto auto;gap:var(--gap);align-items:center}
+    .panel{background:var(--panel);border:1px solid #2a2f5a;border-radius:var(--radius);padding:14px}
+    input[type="text"], select, textarea{width:100%;background:#0f1330;color:var(--text);border:1px solid #2a2f5a;border-radius:12px;padding:10px 12px;outline:none}
+    textarea{min-height:88px;resize:vertical}
+    .hint{color:var(--muted);font-size:12px;margin-top:6px}
+    .switch{display:flex;align-items:center;gap:8px;white-space:nowrap}
+    .btn{background:linear-gradient(180deg,#1a7bbd,#1769a6);border:none;color:white;padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .btn.secondary{background:#26306b}
+    .btn.danger{background:#8d2a2a}
+    .two-cols{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);margin-top:var(--gap)}
+    .stack{display:grid;gap:var(--gap)}
+    .chat{height:430px;overflow:auto;padding:10px;background:#0f1330;border:1px solid #2a2f5a;border-radius:var(--radius)}
+    .msg{display:grid;grid-template-columns:auto 1fr;gap:10px;margin-bottom:14px}
+    .role{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;font-weight:800}
+    .role.user{background:#1d824c}.role.assistant{background:#2a2f7b}.role.system{background:#45415e}.role.tool{background:#684b9a}
+    .bubble{background:#151a3a;border:1px solid #2a2f5a;border-radius:14px;padding:10px 12px;white-space:pre-wrap}
+    .bubble .meta{color:var(--muted);font-size:12px;margin-bottom:4px}
+    .code{background:#101535;border:1px solid #2a2f5a;border-radius:12px;padding:10px;overflow:auto;white-space:pre;direction:ltr;color:#d1d8ff}
+    .logs{height:180px;overflow:auto;background:#0d112e;border:1px solid #2a2f5a;border-radius:12px;padding:8px;font-family:ui-monospace,Consolas,monospace}
+    .tools-bar{display:flex;gap:8px;flex-wrap:wrap}
+    .pill{border:1px solid #2a2f5a;background:#14183a;padding:6px 10px;border-radius:999px;font-size:12px;color:var(--muted)}
+    .small{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2l2.7 5.47 6.05.88-4.38 4.27 1.03 6.01L12 16.9l-5.4 2.73 1.03-6.01L3.25 8.35l6.05-.88L12 2z" fill="url(#g)"/>
+          <defs><linearGradient id="g" x1="0" y1="0" x2="24" y2="24"><stop stop-color="#6ae3ff"/><stop offset="1" stop-color="#a0e8af"/></linearGradient></defs>
+        </svg>
+        <h1>Mini‑AGI — Offline Edition</h1>
+        <span class="beta">بدون مفاتيح · بدون إنترنت</span>
+      </div>
+      <div class="tools-bar">
+        <span class="pill">Plan → Act → Summarize</span>
+        <span class="pill">Code Sandbox · Calc · Memory · Paste-Analyzer</span>
+      </div>
+    </header>
+
+    <div class="toolbar panel">
+      <label class="switch"><input id="showThoughts" type="checkbox"/> إظهار الخطة</label>
+      <button id="clearBtn" class="btn secondary">تفريغ</button>
+      <button id="exportBtn" class="btn secondary">تصدير المحادثة</button>
+      <button id="exportMemBtn" class="btn secondary">تصدير الذاكرة</button>
+      <input id="importMemInput" type="file" accept=".json" style="display:none"/>
+      <button id="importMemBtn" class="btn secondary">استيراد الذاكرة</button>
+    </div>
+
+    <div class="two-cols">
+      <section class="stack">
+        <div class="panel">
+          <div class="chat" id="chat"></div>
+        </div>
+        <div class="panel">
+          <label for="task"><span class="small">المهمة / السؤال</span></label>
+          <textarea id="task" placeholder="اكتب مهمتك هنا… مثال: أنشئ كود JS يرسم رسمًا بسيطًا ويطبع الإحصاءات. أو الصق نصًا طويلًا ليتم تلخيصه."></textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+            <button id="stopBtn" class="btn danger" disabled>إيقاف</button>
+            <button id="runBtn" class="btn">تشغيل الوكيل</button>
+          </div>
+          <div class="hint">كل شيء يعمل محليًا داخل المتصفح. لا يوجد أي اتصال خارجي.</div>
+        </div>
+      </section>
+      <aside class="stack">
+        <div class="panel">
+          <h3 style="margin:0 0 6px">الكود المقترح</h3>
+          <pre id="codeBox" class="code">// سيظهر الكود هنا</pre>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+            <button id="runCodeBtn" class="btn secondary">تشغيل الكود</button>
+            <button id="copyCodeBtn" class="btn secondary">نسخ</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h3 style="margin:0 0 6px">مخرجات التنفيذ (Sandbox)</h3>
+          <div id="logs" class="logs"></div>
+        </div>
+        <div class="panel">
+          <h3 style="margin:0 0 6px">الذاكرة</h3>
+          <textarea id="memInput" placeholder="أدخل حقيقة/معلومة ثابتة تُحفظ محليًا"></textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+            <button id="saveMemBtn" class="btn secondary">حفظ</button>
+            <button id="clearMemBtn" class="btn secondary">مسح</button>
+          </div>
+          <div id="memList" class="hint" style="margin-top:6px"></div>
+        </div>
+      </aside>
+    </div>
+
+    <p class="hint" style="margin-top:10px">⚠️ الأمان: صندوق التنفيذ يمنع الشبكة ويعزل الكود داخل Web Worker. لا تضع بيانات حساسة في المهام.</p>
+  </div>
+
+<script>
+const $ = s => document.querySelector(s);
+const chat = $('#chat'), codeBox = $('#codeBox'), logsBox = $('#logs');
+let controller = null, worker = null;
+
+const state = { memory: load('offline.memory', []) };
+
+function save(k,v){ localStorage.setItem(k, JSON.stringify(v)) }
+function load(k,def){ try{ const x = JSON.parse(localStorage.getItem(k)); return x ?? def } catch { return def } }
+
+function appendMsg(role, content, meta={}){
+  const el = document.createElement('div'); el.className='msg';
+  const roleEl = document.createElement('div'); roleEl.className='role '+(meta.roleClass||role); roleEl.textContent = role[0].toUpperCase();
+  const bubble = document.createElement('div'); bubble.className='bubble';
+  if(meta.title){ const t=document.createElement('div'); t.className='meta'; t.textContent = meta.title; bubble.appendChild(t); }
+  bubble.textContent = content;
+  el.appendChild(roleEl); el.appendChild(bubble); chat.appendChild(el); chat.scrollTop = chat.scrollHeight;
+}
+
+function showPlan(steps){ appendMsg('system', JSON.stringify(steps,null,2), {title:'خطة الوكيل'}) }
+
+function tokenize(s){ return s.toLowerCase().split(/[\\s،,.!?:;\\-]+/).filter(w=>w.length>1) }
+
+function retrieveMemory(query){
+  const terms = new Set(tokenize(query));
+  return state.memory.map((m,i)=>{
+    const t = tokenize(m.text); const score = t.reduce((acc,w)=>acc+(terms.has(w)?1:0),0);
+    return {i, text:m.text, ts:m.ts, score};
+  }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,5);
+}
+
+function simplePlan(task){
+  const steps=[{t:'analyze'},{t:'memory'},{t:'decide'},{t:'act'},{t:'summarize'}];
+  return steps;
+}
+
+function localSummarize(task, memoryHits, result){
+  const lines = [];
+  if(memoryHits?.length){ lines.push('مما وُجد في الذاكرة:\n' + memoryHits.map(m=>'— '+m.text).join('\\n')) }
+  if(result?.calc!==undefined){ lines.push('نتيجة الحاسبة: '+result.calc) }
+  if(result?.code){ lines.push('تم توليد كود وتشغيله؛ راجع اللوجز باليمين.') }
+  if(result?.text){ lines.push('ملخص نصي:\n' + result.text.slice(0,500) + (result.text.length>500?'…':'')) }
+  if(!lines.length){ lines.push('تمت المعالجة محليًا. حدّد جزءًا أدق للتعمّق.') }
+  return lines.join('\\n\\n');
+}
+
+// ===== Code templates (pure local) =====
+function heuristicCode(task){
+  if(/كانفس|canvas|رسم|plot|draw/i.test(task)){
+    return `// رسم حلزون على OffscreenCanvas + طباعة عدد النقاط
+const size=260; const N=380; let a=0,r=0,points=0;
+const canvas = typeof OffscreenCanvas!=='undefined' ? new OffscreenCanvas(size,size) : null;
+if(canvas){
+  const ctx = canvas.getContext('2d'); ctx.fillStyle='#0f1220'; ctx.fillRect(0,0,size,size); ctx.fillStyle='#a0e8af';
+  const cx=size/2, cy=size/2; for(let i=0;i<N;i++){ a+=0.22; r+=0.55; const x=cx+Math.cos(a)*r, y=cy+Math.sin(a)*r; ctx.fillRect(x,y,2,2); points++; }
+  postMessage({type:'image', bitmap: canvas.transferToImageBitmap?.(), width:size, height:size});
+}
+console.log('النقاط:', points);`;
+  }
+  if(/جدول|table|متوسط|average/i.test(task)){
+    return `// توليد جدول عشوائي 12x4 وإظهار المتوسطات
+const rows=12, cols=4; const data=[]; for(let i=0;i<rows;i++){ data.push(Array.from({length:cols},()=>Math.round(Math.random()*100))) }
+console.log('الجدول:', JSON.stringify(data));
+const avgs = Array.from({length:cols}, (_,c)=> (data.reduce((s,row)=>s+row[c],0)/rows).toFixed(2));
+console.log('المتوسطات:', avgs);`;
+  }
+  return `// فيبوناتشي وطباعة أول 14 قيمة
+function fib(n){ let a=0,b=1,arr=[0,1]; for(let i=2;i<n;i++){ [a,b]=[b,a+b]; arr.push(b) } return arr }
+console.log('fib(14)=', fib(14));`;
+}
+
+// ===== Paste-text analyzer =====
+function analyzeText(text){
+  const sentences = text.split(/(?<=[.؟!\\n])\\s+/).filter(Boolean);
+  const words = tokenize(text);
+  const freq = {}; words.forEach(w=>{ freq[w]=(freq[w]||0)+1 });
+  const top = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([w,c])=>`${w}:${c}`).join(', ');
+  return `جمل: ${sentences.length}\nكلمات: ${words.length}\nأكثر مفردات تكرارًا: ${top}`;
+}
+
+// ===== Calculator =====
+function safeCalc(expr){
+  const safe = expr.replace(/\\s+/g,'').replace(/\\^/g,'**');
+  if(!/^[-+*/%().,\\d**]+$/.test(safe)) throw new Error('تعبير غير مسموح');
+  const normalized = safe.replace(/,/g,'.');
+  const val = Function(`\"use strict\"; return (${normalized})`)();
+  if(!Number.isFinite(val)) throw new Error('نتيجة غير صالحة');
+  return val;
+}
+
+// ===== Sandbox via Web Worker =====
+function createWorker(){
+  const code = `
+  self.console = {
+    log: (...args)=>{ self.postMessage({type:'log', text: args.map(String).join(' ')}) },
+    error: (...args)=>{ self.postMessage({type:'err', text: args.map(String).join(' ')}) }
+  };
+  self.fetch = ()=>{ throw new Error('network disabled') };
+  self.XMLHttpRequest = function(){ throw new Error('network disabled') };
+  self.WebSocket = function(){ throw new Error('network disabled') };
+  self.importScripts = function(){ throw new Error('disabled') };
+  self.addEventListener('message', e=>{
+    try{ new Function(e.data).call(null); self.postMessage({type:'done'}); }
+    catch(err){ self.postMessage({type:'err', text: String(err) }); }
+  });`;
+  const blob = new Blob([code], {type:'application/javascript'});
+  const url = URL.createObjectURL(blob);
+  const worker = new Worker(url); URL.revokeObjectURL(url); return worker;
+}
+function resetLogs(){ logsBox.innerHTML='' }
+function logLine(kind, text){
+  const div=document.createElement('div'); div.textContent=(kind==='err'?'[خطأ] ':'')+text; div.style.color=(kind==='err'?'#ff9aa2':'#d1d8ff');
+  logsBox.appendChild(div); logsBox.scrollTop=logsBox.scrollHeight;
+}
+function runInSandbox(code){
+  if(worker) worker.terminate(); worker=createWorker(); resetLogs();
+  worker.onmessage = (e)=>{
+    const {type,text,bitmap,width,height} = e.data;
+    if(type==='log') logLine('log', text);
+    if(type==='err') logLine('err', text);
+    if(type==='image' && bitmap){
+      const c=document.createElement('canvas'); c.width=width; c.height=height;
+      const ctx=c.getContext('2d'); ctx.drawImage(bitmap,0,0);
+      const wrap=document.createElement('div'); wrap.style.marginTop='6px'; wrap.appendChild(c); logsBox.appendChild(wrap);
+    }
+    if(type==='done') logLine('log','✓ انتهى التنفيذ');
+  };
+  worker.postMessage(code);
+}
+
+// ===== Memory UI =====
+function renderMem(){
+  const box = $('#memList');
+  if(!state.memory.length){ box.textContent='لا يوجد عناصر.'; return; }
+  box.innerHTML = state.memory.map(m=>`• ${new Date(m.ts).toLocaleString()} — ${m.text}`).join('\\n');
+}
+function addMem(text){ state.memory.unshift({text, ts: Date.now()}); save('offline.memory',state.memory); renderMem() }
+function clearMem(){ state.memory=[]; save('offline.memory',state.memory); renderMem() }
+
+// ===== Agent =====
+async function runAgent(){
+  const task = $('#task').value.trim(); if(!task) return;
+  const showThoughts = $('#showThoughts').checked;
+  $('#runBtn').disabled=true; $('#stopBtn').disabled=false;
+  controller = new AbortController();
+
+  appendMsg('user', task, {title:'المستخدم'});
+  const plan = simplePlan(task); if(showThoughts) showPlan(plan);
+
+  const memHits = retrieveMemory(task);
+  let result = {text:'', code:'', calc:undefined};
+
+  // decide & act
+  // 1) calc if an expression exists
+  const exprMatch = task.match(/[0-9].*[+\\-*\\/^%()].*/);
+  if(exprMatch){ try{ result.calc = safeCalc(exprMatch[0]) }catch(e){ appendMsg('system','خطأ حاسبة: '+e.message) }}
+
+  // 2) if user pasted long text, analyze
+  if(task.length>200){
+    result.text = analyzeText(task);
+  }
+
+  // 3) try generate code template if keywords found
+  const code = heuristicCode(task);
+  if(code){ result.code = code; codeBox.textContent = code; runInSandbox(code); }
+
+  const summary = localSummarize(task, memHits, result);
+  appendMsg('assistant', summary, {title:'الوكيل'});
+
+  $('#runBtn').disabled=false; $('#stopBtn').disabled=true;
+}
+
+function stopAgent(){ if(controller){ controller.abort() } if(worker){ worker.terminate() } $('#runBtn').disabled=false; $('#stopBtn').disabled=true; appendMsg('system','تم الإيقاف.') }
+
+// ===== Wire UI =====
+$('#runBtn').addEventListener('click', runAgent);
+$('#stopBtn').addEventListener('click', stopAgent);
+$('#clearBtn').addEventListener('click', ()=>{ chat.innerHTML=''; codeBox.textContent=''; resetLogs(); });
+$('#runCodeBtn').addEventListener('click', ()=>{ const code=codeBox.textContent; if(code) runInSandbox(code) });
+$('#copyCodeBtn').addEventListener('click', ()=>{ navigator.clipboard.writeText(codeBox.textContent) });
+
+$('#saveMemBtn').addEventListener('click', ()=>{ const t=$('#memInput').value.trim(); if(t){ addMem(t); $('#memInput').value='' } });
+$('#clearMemBtn').addEventListener('click', ()=>{ if(confirm('مسح الذاكرة بالكامل؟')) clearMem() });
+
+$('#exportBtn').addEventListener('click', ()=>{
+  const blob = new Blob([chat.innerText], {type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`mini-agi-offline-${Date.now()}.txt`; a.click(); URL.revokeObjectURL(a.href);
+});
+$('#exportMemBtn').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(state.memory,null,2)], {type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='offline-memory.json'; a.click(); URL.revokeObjectURL(a.href);
+});
+$('#importMemBtn').addEventListener('click', ()=> $('#importMemInput').click());
+$('#importMemInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader(); reader.onload = ()=>{ try{ state.memory = JSON.parse(reader.result); save('offline.memory',state.memory); renderMem() } catch(err){ alert('ملف غير صالح') } }; reader.readAsText(file);
+});
+
+renderMem();
+appendMsg('system','النسخة تعمل محليًا ١٠٠٪ بدون إنترنت أو مفاتيح. الصق نصًا طويلاً للتلخيص الإحصائي، أو اطلب كود رسم/جدول/فيبوناتشي، أو أضف حقائق للذاكرة.', {title:'إرشاد'});
+</script>
+</body>
+</html>
