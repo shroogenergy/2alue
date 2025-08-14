@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini-AGI Playground — HuggingFace Edition</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #0f1220; color: #eef1ff; }
+    .container { max-width: 1000px; margin: auto; padding: 20px; }
+    header { display: flex; justify-content: space-between; align-items: center; }
+    h1 { font-size: 22px; }
+    textarea, input, select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #444; background: #151935; color: #eef1ff; }
+    button { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; }
+    .btn { background: #1769a6; color: white; }
+    .btn:disabled { background: #333; cursor: not-allowed; }
+    .chat { height: 400px; overflow-y: auto; background: #0f1330; padding: 10px; border-radius: 8px; border: 1px solid #333; margin-top: 10px; }
+    .msg { margin-bottom: 12px; }
+    .msg .role { font-weight: bold; }
+    .panel { background: #151935; padding: 10px; border-radius: 8px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+<div class="container">
+<header>
+  <h1>Mini‑AGI Playground (HuggingFace)</h1>
+</header>
+
+<div class="panel">
+  <label>HuggingFace API Key (اختياري - مجاني)</label>
+  <input id="apiKey" type="password" placeholder="hf_..." />
+  <label>Model</label>
+  <select id="model">
+    <option value="bigscience/bloomz-560m">bigscience/bloomz-560m</option>
+    <option value="tiiuae/falcon-7b-instruct">tiiuae/falcon-7b-instruct</option>
+  </select>
+  <label><input type="checkbox" id="useLLM" /> استخدام LLM</label>
+</div>
+
+<div class="panel">
+  <label>المهمة / السؤال</label>
+  <textarea id="task" placeholder="اكتب مهمتك هنا..."></textarea>
+  <button class="btn" id="runBtn">تشغيل الوكيل</button>
+</div>
+
+<div class="chat" id="chat"></div>
+
+</div>
+<script>
+const chatEl = document.getElementById('chat');
+
+function appendMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = 'msg';
+  div.innerHTML = `<div class="role">${role}</div><div class="bubble">${text}</div>`;
+  chatEl.appendChild(div);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+async function runAgent(){
+  const prompt = document.getElementById('task').value.trim();
+  if(!prompt) return;
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const model = document.getElementById('model').value;
+  const useLLM = document.getElementById('useLLM').checked;
+  appendMsg('المستخدم', prompt);
+
+  if(useLLM){
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if(apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+      const res = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ inputs: prompt })
+      });
+      if(!res.ok) throw new Error("فشل الطلب إلى HuggingFace");
+      const data = await res.json();
+      let outputText = "";
+      if(Array.isArray(data) && data[0]?.generated_text){
+        outputText = data[0].generated_text;
+      } else if(typeof data === "object" && data.generated_text){
+        outputText = data.generated_text;
+      } else {
+        outputText = JSON.stringify(data);
+      }
+      appendMsg('الوكيل', outputText);
+    } catch(e){
+      appendMsg('النظام', "خطأ: " + e.message);
+    }
+  } else {
+    // Local basic mode: echo and simple info
+    appendMsg('الوكيل (محلي)', "خطة: البحث عن ""+prompt+"" + تقديم ملخص.
+(ملاحظة: الوضع المحلي لا يستخدم ذكاء اصطناعي متقدم)");
+  }
+}
+
+document.getElementById('runBtn').addEventListener('click', runAgent);
+</script>
+</body>
+</html>
