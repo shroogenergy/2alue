@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini‑AGI Playground — Local LLM Edition (Single‑File)</title>
+  <style>
+    :root{
+      --bg:#0f1220; --panel:#151935; --muted:#8a92b2; --text:#eef1ff; --accent:#6ae3ff; --accent2:#a0e8af; --danger:#ff6b6b;
+      --radius:18px; --gap:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(180deg,#0c0f1d,#0f1220 40%,#0f1220);color:var(--text);font:15px/1.6 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .container{max-width:1100px;margin-inline:auto;padding:22px}
+    header{display:flex;gap:var(--gap);align-items:center;justify-content:space-between;margin-bottom:18px}
+    .title{display:flex;align-items:center;gap:10px}
+    .title h1{margin:0;font-size:22px;font-weight:700}
+    .beta{padding:2px 8px;border-radius:999px;background:#1e2345;color:var(--muted);font-size:12px}
+    .toolbar{display:grid;grid-template-columns:1.1fr .8fr .9fr auto auto auto;gap:var(--gap);align-items:center}
+    .panel{background:var(--panel);border:1px solid #2a2f5a;border-radius:var(--radius);padding:14px}
+    input[type="text"], input[type="password"], select, textarea{width:100%;background:#0f1330;color:var(--text);border:1px solid #2a2f5a;border-radius:12px;padding:10px 12px;outline:none}
+    textarea{min-height:88px;resize:vertical}
+    .hint{color:var(--muted);font-size:12px;margin-top:6px}
+    .switch{display:flex;align-items:center;gap:8px;white-space:nowrap}
+    .btn{background:linear-gradient(180deg,#1a7bbd,#1769a6);border:none;color:white;padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .btn.secondary{background:#26306b}
+    .btn.danger{background:#8d2a2a}
+    .two-cols{display:grid;grid-template-columns:1fr 0.9fr;gap:var(--gap);margin-top:var(--gap)}
+    .stack{display:grid;gap:var(--gap)}
+    /* Chat */
+    .chat{height:520px;overflow:auto;padding:10px;background:#0f1330;border:1px solid #2a2f5a;border-radius:var(--radius)}
+    .msg{display:grid;grid-template-columns:auto 1fr;gap:10px;margin-bottom:14px}
+    .role{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;font-weight:800}
+    .role.user{background:#1d824c}
+    .role.assistant{background:#2a2f7b}
+    .role.system{background:#45415e}
+    .role.tool{background:#684b9a}
+    .bubble{background:#151a3a;border:1px solid #2a2f5a;border-radius:14px;padding:10px 12px;white-space:pre-wrap}
+    .bubble .meta{color:var(--muted);font-size:12px;margin-bottom:4px}
+    .divider{height:1px;background:#2a2f5a;margin:10px 0}
+    code.inline{background:#101535;padding:2px 6px;border-radius:8px;border:1px solid #2a2f5a}
+    .tools-bar{display:flex;gap:8px;flex-wrap:wrap}
+    .pill{border:1px solid #2a2f5a;background:#14183a;padding:6px 10px;border-radius:999px;font-size:12px;color:var(--muted)}
+    .memory-list{display:grid;gap:8px;max-height:220px;overflow:auto}
+    .memory-item{border:1px dashed #37407d;border-radius:12px;padding:8px}
+    .footer{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px}
+    .small{font-size:12px;color:var(--muted)}
+    a.link{color:var(--accent)}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2l2.7 5.47 6.05.88-4.38 4.27 1.03 6.01L12 16.9l-5.4 2.73 1.03-6.01L3.25 8.35l6.05-.88L12 2z" fill="url(#g)"/>
+          <defs><linearGradient id="g" x1="0" y1="0" x2="24" y2="24"><stop stop-color="#6ae3ff"/><stop offset="1" stop-color="#a0e8af"/></linearGradient></defs>
+        </svg>
+        <h1>Mini‑AGI Playground</h1>
+        <span class="beta">Local LLM</span>
+      </div>
+      <div class="tools-bar">
+        <span class="pill">Agent Loop: Plan → Act → Reflect</span>
+        <span class="pill">Tools: Search · Calc · Fetch · Memory · Local LLM</span>
+      </div>
+    </header>
+
+    <div class="toolbar panel">
+      <label><span class="small">المحرك</span>
+        <select id="backend">
+          <option value="local-webllm" selected>Local (WebLLM) — بدون مفتاح</option>
+          <option value="hf">HuggingFace Inference</option>
+          <option value="openai">OpenAI</option>
+        </select>
+      </label>
+      <label><span class="small">النموذج (للمحلي)</span>
+        <select id="localModel">
+          <option value="Llama-3.2-1B-Instruct-q4f32_1" selected>Llama‑3.2‑1B‑Instruct (q4)</option>
+          <option value="Qwen2-0.5B-Instruct-q4f32_1">Qwen2‑0.5B‑Instruct (q4)</option>
+        </select>
+      </label>
+      <label><span class="small">HF Token (اختياري)</span>
+        <input id="hfToken" type="password" placeholder="hf_..." autocomplete="off" />
+      </label>
+      <label><span class="small">OpenAI Key (اختياري)</span>
+        <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
+      </label>
+      <label class="switch"><input id="useLLM" type="checkbox" checked/> تفعيل LLM</label>
+      <button id="clearBtn" class="btn secondary">تفريغ المحادثة</button>
+    </div>
+
+    <div class="two-cols">
+      <section class="stack">
+        <div class="panel">
+          <div class="chat" id="chat"></div>
+          <div class="footer">
+            <button id="exportBtn" class="btn secondary">تصدير المحادثة</button>
+          </div>
+        </div>
+        <div class="panel">
+          <label for="task"><span class="small">المهمة / السؤال</span></label>
+          <textarea id="task" placeholder="اكتب ما تريد أن ينجزه الوكيل… مثال: حلّل مقالاً وحدّد الحجج المؤيدة والمعارضة"></textarea>
+          <div class="footer">
+            <button id="stopBtn" class="btn danger" disabled>إيقاف</button>
+            <button id="runBtn" class="btn">تشغيل الوكيل</button>
+          </div>
+          <div class="hint">الوضع المحلي يعمل بالكامل بدون مفاتيح — سيتحمّل المتصفح وزن النموذج أول مرة (قد يستغرق وقتًا على النت البطيء).</div>
+        </div>
+      </section>
+      <aside class="stack">
+        <div class="panel">
+          <h3 style="margin:0 0 8px 0">الذاكرة طويلة المدى</h3>
+          <textarea id="memoryInput" placeholder="أضف ملاحظة أو حقيقة دائمة (سيتم حفظها محليًا)"></textarea>
+          <div class="footer">
+            <button id="saveMemBtn" class="btn secondary">حفظ في الذاكرة</button>
+            <button id="clearMemBtn" class="btn secondary">مسح الذاكرة</button>
+          </div>
+          <div class="divider"></div>
+          <div class="memory-list" id="memoryList"></div>
+        </div>
+        <div class="panel">
+          <h3 style="margin:0 0 8px 0">الأدوات المدمجة</h3>
+          <div class="hint">يمكن استدعاؤها تلقائيًا أو تجريبها يدويًا:</div>
+          <div class="footer">
+            <button id="trySearch" class="btn secondary">تجربة البحث</button>
+            <button id="tryCalc" class="btn secondary">تجربة الحاسبة</button>
+            <button id="tryFetch" class="btn secondary">تجربة Fetch</button>
+          </div>
+          <div id="toolsOutput" class="hint" style="margin-top:6px;white-space:pre-wrap"></div>
+        </div>
+      </aside>
+    </div>
+
+    <p class="hint" style="margin-top:16px">⚠️ قد تمنع بعض المواقع طلبات المتصفح (CORS). يوصى بالاستخدام مع مصادر تسمح بالوصول المباشر أو عبر وكيل.</p>
+  </div>
+
+  <!-- Local LLM in the browser via WebLLM -->
+  <script src="https://unpkg.com/@mlc-ai/web-llm/dist/webllm.min.js"></script>
+
+  <script>
+    /********************* Utilities *********************/
+    const $ = sel => document.querySelector(sel);
+    const chatEl = $('#chat');
+    const state = { running:false, controller:null, memory: loadMemory(), showThoughts: false, localEngine:null };
+
+    function uuid(){return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16))}
+    function now(){return new Date().toLocaleString()}
+    function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
+    function load(k,def){try{const x=JSON.parse(localStorage.getItem(k));return x??def}catch{ return def}}
+
+    function loadMemory(){return load('miniAGI.memory', [])}
+    function persistMemory(){save('miniAGI.memory', state.memory)}
+
+    function addMemory(text){state.memory.unshift({id:uuid(), text, ts:Date.now()}); persistMemory(); renderMemory()}
+    function clearMemory(){state.memory = []; persistMemory(); renderMemory()}
+
+    function renderMemory(){
+      const box = $('#memoryList');
+      if(!state.memory.length){box.innerHTML = '<span class="hint">لا توجد عناصر بعد.</span>'; return}
+      box.innerHTML = state.memory.map(m=>`<div class="memory-item"><div class="small">${new Date(m.ts).toLocaleString()}</div>${escapeHTML(m.text)}</div>`).join('')
+    }
+
+    function escapeHTML(s){return s.replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))}
+
+    function appendMsg(role, content, meta={}){
+      const wrapper = document.createElement('div');
+      wrapper.className = 'msg';
+      const roleEl = document.createElement('div');
+      roleEl.className = 'role ' + (meta.roleClass || role);
+      roleEl.textContent = role[0].toUpperCase();
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      if(meta.title){
+        const metaEl = document.createElement('div');
+        metaEl.className = 'meta';
+        metaEl.textContent = meta.title;
+        bubble.appendChild(metaEl);
+      }
+      bubble.insertAdjacentHTML('beforeend', content);
+      wrapper.appendChild(roleEl); wrapper.appendChild(bubble);
+      chatEl.appendChild(wrapper);
+      chatEl.scrollTop = chatEl.scrollHeight;
+      return bubble;
+    }
+
+    function divider(){chatEl.insertAdjacentHTML('beforeend', '<div class="divider"></div>')}
+
+    function setRunning(v){state.running=v; $('#runBtn').disabled=v; $('#stopBtn').disabled=!v; $('#clearBtn').disabled=v}
+
+    function exportTranscript(){
+      const blob = new Blob([chatEl.innerText], {type:'text/plain;charset=utf-8'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `mini-agi-${Date.now()}.txt`; a.click(); URL.revokeObjectURL(a.href);
+    }
+
+    /********************* Built-in Tools *********************/
+    async function tool_search(query, signal){
+      const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&no_html=1`;
+      const r = await fetch(url, {signal});
+      const j = await r.json();
+      const related = (j.RelatedTopics||[]).slice(0,5).map(x=>{ if(x.Topics && x.Topics.length){ x = x.Topics[0] } return {text: x.Text||'', url: x.FirstURL||''} });
+      return { abstract: j.AbstractText || '', heading: j.Heading || '', results: related };
+    }
+
+    function tool_calc(expr){
+      const safe = expr.replace(/\s+/g,'').replace(/\^/g,'**');
+      if(!/^[-+*/%().,\d**]+$/.test(safe)) throw new Error('تعبير غير مسموح');
+      const normalized = safe.replace(/,/g,'.');
+      const val = Function(`"use strict"; return (${normalized})`)();
+      if(!Number.isFinite(val)) throw new Error('نتيجة غير صالحة');
+      return val;
+    }
+
+    async function tool_fetch(url, signal){
+      const r = await fetch(url, {signal, headers:{'Accept':'text/plain, application/json'}});
+      const text = await r.text();
+      return text.slice(0, 2000);
+    }
+
+    function tool_memory_retrieve(prompt){
+      if(!state.memory.length) return [];
+      const terms = new Set(prompt.toLowerCase().split(/[\s،,.!?:;]+/).filter(w=>w.length>2));
+      const scored = state.memory.map(m=>{ const t = m.text.toLowerCase(); let score = 0; terms.forEach(w=>{ if(t.includes(w)) score+=1 }); return {...m, score}; })
+        .filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,5);
+      return scored;
+    }
+
+    const Tools = {
+      async search(arg, ctx){ return await tool_search(arg.query||arg, ctx.signal) },
+      calc(arg){ return tool_calc(arg.expr||arg) },
+      async fetch(arg, ctx){ return await tool_fetch(arg.url||arg, ctx.signal) },
+      memoryRetrieve(arg){ return tool_memory_retrieve(arg.prompt||arg) }
+    };
+
+    /********************* Offline Planner / Synthesizer *********************/
+    function simplePlan(prompt){
+      const wantsMath = /\b(احسب|كم|المعادلة|٪|%|\d+\s*[+\-*/^×÷])\b/i.test(prompt);
+      const wantsWeb = /\b(ما هو|من هو|الأخبار|أحدث|مصدر|راجع|قارن|مقارنة|متى|كيف|لماذا|تعريف|مراجع|cite|reference)\b/i.test(prompt);
+      const steps = [];
+      steps.push({type:'memory', about: prompt});
+      if(wantsWeb) steps.push({type:'search', query: prompt});
+      if(wantsMath) steps.push({type:'calc', expr: prompt.match(/[\d.\s+\-*/%^()]+/g)?.join(' ')||''});
+      if(!wantsWeb && !wantsMath) steps.push({type:'search', query: prompt + ' site:wikipedia.org'});
+      steps.push({type:'fetchMaybe'});
+      steps.push({type:'synthesize'});
+      return {steps};
+    }
+
+    function synthesizeLocal(prompt, ctx){
+      const {search, calc, memory, fetched} = ctx;
+      let out = '';
+      if(search){
+        const lines = [];
+        if(search.heading) lines.push(`• ${search.heading}`);
+        if(search.abstract) lines.push(search.abstract);
+        if(search.results && search.results.length){ lines.push('\nروابط مفيدة:'); search.results.forEach((r,i)=> lines.push(`${i+1}. ${r.text} — ${r.url}`)); }
+        out += lines.join('\n') + '\n\n';
+      }
+      if(typeof calc !== 'undefined'){ out += `نتيجة الحساب: ${calc}\n\n`; }
+      if(memory && memory.length){ out += `مما تذكّرته سابقًا:\n` + memory.map(m=>`— ${m.text}`).join('\n') + '\n\n'; }
+      if(fetched){ out += `مقتطف من المصدر:\n${fetched}\n\n`; }
+      out += `خلاصة مركّزة:\n` + summarizeHeuristic(prompt, search, calc, fetched);
+      return out;
+    }
+
+    function summarizeHeuristic(prompt, search, calc, fetched){
+      const bullets = [];
+      if(search?.heading) bullets.push(`تعريف مبدئي: ${search.heading}.`);
+      if(search?.abstract) bullets.push(`ملخّص: ${search.abstract.slice(0, 220)}…`);
+      if(typeof calc !== 'undefined') bullets.push(`الحساب يعطي: ${calc}.`);
+      if(fetched) bullets.push(`اطّلعنا على مصدر إضافي.`);
+      bullets.push(`الخطوة التالية: حدّد نطاقًا أدق للتعمّق.`);
+      return '• ' + bullets.join('\n• ');
+    }
+
+    /********************* LLM Backends *********************/
+    async function ensureLocalEngine(){
+      if(state.localEngine) return state.localEngine;
+      const model = $('#localModel').value;
+      appendMsg('system', `تحميل النموذج المحلي: ${model}… قد يستغرق أول تشغيل حسب سرعة الشبكة.`, {title:'Local LLM'});
+      const engine = new webllm.MLCEngine();
+      await engine.reload(model, {
+        // يمكنك تحديد مسار CDN أو ترك الإعدادات الافتراضية لـ unpkg
+      });
+      state.localEngine = engine;
+      appendMsg('system', 'تم تحميل النموذج المحلي.', {title:'Local LLM'});
+      return engine;
+    }
+
+    async function llmLocal(messages, signal){
+      const engine = await ensureLocalEngine();
+      const reply = await engine.chat.completions.create({ messages, temperature: 0.3 });
+      return reply.choices?.[0]?.message?.content || '';
+    }
+
+    async function llmHF(messages, token, signal){
+      const input = messages.map(m=>`<|${m.role}|> ${m.content}`).join('\n');
+      const r = await fetch('https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',{
+        method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}, body:JSON.stringify({inputs: input, parameters:{max_new_tokens:256,temperature:0.3}}), signal
+      });
+      if(!r.ok) throw new Error('HF request failed');
+      const j = await r.json();
+      return (Array.isArray(j) ? j[0]?.generated_text : j.generated_text) || j?.[0]?.summary_text || '';
+    }
+
+    async function llmOpenAI(messages, apiKey, signal){
+      const r = await fetch('https://api.openai.com/v1/chat/completions', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`}, body: JSON.stringify({model:'gpt-4o-mini', messages, temperature:0.3}), signal });
+      if(!r.ok) throw new Error('OpenAI request failed');
+      const j = await r.json();
+      return j.choices?.[0]?.message?.content || '';
+    }
+
+    /********************* Agent Loop *********************/
+    async function runAgent(){
+      const prompt = $('#task').value.trim(); if(!prompt) return;
+      const backend = $('#backend').value;
+      const useLLM = $('#useLLM').checked;
+      setRunning(true); state.controller = new AbortController();
+      const ctx = {signal: state.controller.signal, search:null, calc: undefined, memory:[], fetched:''};
+
+      appendMsg('user', escapeHTML(prompt), {title:`المستخدم · ${now()}`});
+
+      const plan = simplePlan(prompt);
+      appendMsg('system', '<em>خطة أولية:</em> '+escapeHTML(JSON.stringify(plan.steps, null, 2)), {title:'Planner'});
+
+      for(const step of plan.steps){ if(state.controller.signal.aborted) break; try{
+        if(step.type==='memory'){ ctx.memory = Tools.memoryRetrieve({prompt}); if(ctx.memory.length){ appendMsg('tool', escapeHTML(JSON.stringify(ctx.memory,null,2)), {title:'Memory', roleClass:'tool'}) } }
+        if(step.type==='search'){ const res = await Tools.search({query: step.query}, ctx); ctx.search = res; appendMsg('tool', `<div class="small">نتيجة البحث</div>${escapeHTML((res.abstract||'').slice(0,400))}`, {title:'Search', roleClass:'tool'}); }
+        if(step.type==='calc' && step.expr){ ctx.calc = Tools.calc({expr: step.expr}); appendMsg('tool', `<code class="inline">${escapeHTML(step.expr)}</code> = <strong>${ctx.calc}</strong>`, {title:'Calc', roleClass:'tool'}); }
+        if(step.type==='fetchMaybe' && ctx.search?.results?.[0]?.url){ try{ const text = await Tools.fetch({url: ctx.search.results[0].url}, ctx); ctx.fetched = text; appendMsg('tool', escapeHTML(text.slice(0,400)), {title:'Fetch', roleClass:'tool'}) }catch(e){} }
+      }catch(err){ appendMsg('system', `<span style="color:var(--danger)">خطأ الأداة:</span> ${escapeHTML(err.message)}`, {title:'Agent'}) } }
+
+      let finalText = '';
+      if(useLLM){
+        const messages = [
+          {role:'system', content: 'أنت وكيل تحليلي يدمج نتائج الأدوات ويكتب إجابة عربية دقيقة وموجزة مع نقاط مرقمة وروابط عند الحاجة.'},
+          {role:'user', content: `المهمة: ${prompt}`},
+          {role:'user', content: `مخرجات الأدوات (JSON): ${JSON.stringify(ctx)}`}
+        ];
+        try{
+          if(backend==='local-webllm') finalText = await llmLocal(messages, state.controller.signal);
+          else if(backend==='hf') finalText = await llmHF(messages, $('#hfToken').value.trim(), state.controller.signal);
+          else if(backend==='openai') finalText = await llmOpenAI(messages, $('#apiKey').value.trim(), state.controller.signal);
+        }catch(e){ appendMsg('system', `<span style="color:var(--danger)">تعذّر استخدام ${backend}:</span> ${escapeHTML(e.message)} — سيتم استخدام الملخّص المحلي.`); finalText = synthesizeLocal(prompt, ctx); }
+      }else{ finalText = synthesizeLocal(prompt, ctx); }
+
+      appendMsg('assistant', escapeHTML(finalText), {title:`الوكيل · ${now()}`});
+      setRunning(false);
+    }
+
+    function stopAgent(){ if(state.controller){ state.controller.abort(); setRunning(false); appendMsg('system', 'تم الإيقاف.', {title:'Agent'}) } }
+
+    /********************* Wire UI *********************/
+    $('#runBtn').addEventListener('click', runAgent);
+    $('#stopBtn').addEventListener('click', stopAgent);
+    $('#clearBtn').addEventListener('click', ()=>{ chatEl.innerHTML=''; })
+    $('#exportBtn').addEventListener('click', exportTranscript);
+
+    $('#saveMemBtn').addEventListener('click', ()=>{ const t=$('#memoryInput').value.trim(); if(t){ addMemory(t); $('#memoryInput').value=''; } });
+    $('#clearMemBtn').addEventListener('click', ()=>{ if(confirm('مسح الذاكرة بالكامل؟')) clearMemory(); });
+
+    $('#trySearch').addEventListener('click', async ()=>{ const q = prompt('استعلام البحث:','الذكاء الاصطناعي العام AGI'); if(!q) return; const res = await Tools.search({query:q}, {signal: new AbortController().signal}); $('#toolsOutput').textContent = JSON.stringify(res, null, 2); });
+    $('#tryCalc').addEventListener('click', ()=>{ const e = prompt('تعبير حسابي:','(2+3)*4^2 / 5'); if(!e) return; try{ const v = Tools.calc({expr:e}); $('#toolsOutput').textContent = e+" = "+v }catch(err){ $('#toolsOutput').textContent = 'خطأ: '+err.message } });
+    $('#tryFetch').addEventListener('click', async ()=>{ const u = prompt('رابط (قد يفشل بسبب CORS):','https://ar.wikipedia.org/wiki/الذكاء_الاصطناعي_العام'); if(!u) return; try{ const t = await Tools.fetch({url:u}, {signal:new AbortController().signal}); $('#toolsOutput').textContent = t } catch(err){ $('#toolsOutput').textContent = 'خطأ: '+err.message } });
+
+    // Initial render
+    renderMemory();
+    appendMsg('system', 'جاهز! اختر المحرك «Local (WebLLM)» لتشغيل نموذج محلي داخل المتصفح بدون أي مفاتيح. أول تشغيل سيحمّل أوزان النموذج من الـ CDN.', {title:'إرشاد'});
+  </script>
+</body>
+</html>
