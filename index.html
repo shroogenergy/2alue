@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini‑AGI (Offline) — Fixed</title>
+<style>
+:root{--bg:#0b0f14;--card:#121926;--muted:#93a4b0;--text:#e6edf3;--accent:#4cc38a;--danger:#ff6b6b;}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#0b0f14,#0e141b);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
+.container{max-width:1000px;margin:20px auto;padding:16px}
+.header{display:flex;gap:12px;align-items:center;justify-content:space-between}
+.badge{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;background:#0e1623;border:1px solid #243044;color:var(--muted);font-size:12px}
+.card{background:var(--card);border:1px solid #1c2433;border-radius:16px;padding:14px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.col{flex:1 1 320px}
+.input, textarea{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #233044;background:#0b121d;color:var(--text);outline:none}
+.btn{display:inline-flex;gap:8px;align-items:center;padding:10px 14px;border-radius:12px;border:1px solid #243044;background:#0e1623;color:var(--text);cursor:pointer}
+.btn:hover{border-color:#2f3f57}
+.btn.primary{background:linear-gradient(180deg,#134e4a,#0f766e);border-color:#0f766e}
+.btn.danger{background:linear-gradient(180deg,#642,#512);border-color:#a33}
+.kbd{border:1px solid #2a3b55;background:#0c1523;border-radius:6px;padding:1px 6px;color:#bcd; font-size:12px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.list{max-height:260px;overflow:auto;padding:0;margin:0;list-style:none}
+.list li{padding:10px;border-bottom:1px solid #202b3d}
+.small{font-size:12px;color:var(--muted)}
+hr{border:0;border-top:1px solid #223049;margin:12px 0}
+pre{white-space:pre-wrap;background:#08111d;border:1px solid #1a2537;border-radius:12px;padding:10px;overflow:auto}
+.icon{width:18px;height:18px;display:inline-block;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2}
+.success{color:var(--accent)}
+.err{color:var(--danger)}
+footer{opacity:.7;font-size:12px;text-align:center;margin-top:16px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="badge" title="Fully offline — no internet">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 18 0" /><path d="M3 12h18" /><path d="M7 12a5 5 0 0 1 10 0" /><path d="M10 12a2 2 0 0 1 4 0" /></svg>
+      وضع أوفلاين
+    </div>
+    <div class="toolbar">
+      <button class="btn" id="btnMemory">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" ry="2"/><path d="M7 8h10M7 12h6"/><path d="M3 10h-2M23 10h-2M3 14h-2M23 14h-2"/></svg>
+        الذاكرة
+      </button>
+      <button class="btn" id="btnExport">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M5 21h14"/></svg>
+        تصدير
+      </button>
+      <button class="btn danger" id="btnReset">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9"/><path d="M3 12h7"/></svg>
+        مسح
+      </button>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>المهمة</label>
+    <textarea id="task" rows="3" placeholder="مثال: ارسم حلزون على كانفس واطبع عدد النقاط، أو حل مسألة، أو أنشئ كود ..."></textarea>
+    <div class="toolbar" style="margin-top:10px">
+      <button class="btn primary" id="btnRun">
+        <svg class="icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        شغّل
+      </button>
+      <button class="btn" id="btnTemplates">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        قوالب
+      </button>
+      <span class="small">تلميح: <span class="kbd">Ctrl</span> + <span class="kbd">Enter</span></span>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:12px">
+    <div class="col card">
+      <div style="display:flex;align-items:center;gap:8px">
+        <svg class="icon success" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg>
+        <b>الخطة</b>
+      </div>
+      <ul class="list" id="plan"></ul>
+    </div>
+    <div class="col card">
+      <div style="display:flex;align-items:center;gap:8px">
+        <svg class="icon success" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+        <b>العمل</b>
+      </div>
+      <div id="act"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M4 19h16M4 11h16M4 7h16"/><path d="M8 7v12"/></svg>
+      <b>المُخرجات</b>
+    </div>
+    <pre id="output"></pre>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="14" rx="2"/><path d="M8 21h8"/></svg>
+      <b>نتيجة الكود</b>
+    </div>
+    <iframe id="sandbox" title="sandbox" style="width:100%;height:260px;border:1px solid #1a2537;border-radius:12px;background:white" sandbox="allow-scripts"></iframe>
+  </div>
+
+  <footer>Mini‑AGI Offline — نسخة ثابتة بدون تبعيات خارجية. جميع الأيقونات SVG مضمّنة محليًا.</footer>
+</div>
+
+<script>
+// --- State ---
+const state = {
+  memory: JSON.parse(localStorage.getItem("miniagi_mem")||"[]"),
+  history: JSON.parse(localStorage.getItem("miniagi_hist")||"[]")
+};
+
+function save(){ localStorage.setItem("miniagi_mem", JSON.stringify(state.memory));
+                 localStorage.setItem("miniagi_hist", JSON.stringify(state.history)); }
+
+// --- UI helpers ---
+const $ = sel => document.querySelector(sel);
+const planEl = $("#plan"), actEl = $("#act"), outEl = $("#output"), box = $("#sandbox");
+
+function icon(name){ // minimal inline icons if needed later
+  return '';
+}
+
+function pushPlan(txt){ const li = document.createElement('li'); li.textContent = txt; planEl.appendChild(li); }
+function logAct(html){ const div = document.createElement('div'); div.innerHTML = html; actEl.appendChild(div); }
+function print(txt){ outEl.textContent += (txt + "\\n"); }
+
+// --- Templates ---
+const templates = [
+  {title:"رسم حلزون على Canvas", prompt:"اكتب كود جافاسكربت يرسم حلزون على كانفس داخل iframe بعرض 600 وارتفاع 240، ثم احسب واطبع عدد النقاط المرسومة."},
+  {title:"جدول مع إحصائيات", prompt:"أنشئ جدول 12×4 بقيم عشوائية من 1..99 ثم احسب المتوسط والانحراف لكل عمود واطبع النتائج."},
+  {title:"متتالية فيبوناتشي", prompt:"اكتب دالة تولّد فيبوناتشي حتى يتجاوز العدد 10000 واطبع السلسلة والطول."}
+];
+
+// --- Simple offline 'Planner' ---
+function plan(task){
+  planEl.innerHTML = ""; actEl.innerHTML=""; outEl.textContent=""; 
+  pushPlan("فهم المطلوب وصياغته إلى خطوات.");
+  pushPlan("تجزئة المهمة إلى وظائف صغيرة قابلة للتنفيذ.");
+  pushPlan("إن لزم، توليد كود وتشغيله داخل صندوق معزول.");
+  pushPlan("تلخيص النتائج وطباعتها.");
+}
+
+// --- Executor ---
+function run(task){
+  // naive, rule-based: choose tool
+  const lower = task.toLowerCase();
+  let code="";
+  if(lower.includes("كانفس") || lower.includes("canvas")){
+    code = `
+      const c=document.createElement('canvas'); c.width=600; c.height=240; document.body.appendChild(c);
+      const ctx=c.getContext('2d'); let x=300,y=120,a=0,r=1,count=0;
+      function step(){ a+=0.1; r+=0.15; x=300+Math.cos(a)*r; y=120+Math.sin(a)*r; ctx.fillRect(x,y,1,1); count++; if(r<110) requestAnimationFrame(step); else { const p=document.createElement('p'); p.textContent="النقاط: "+count; document.body.appendChild(p);} }
+      step();
+    `;
+    logAct("تم اختيار قالب الرسم بالكانفس.");
+  }else if(lower.includes("جدول")||lower.includes("table")){
+    code = `
+      function rnd(){return Math.floor(Math.random()*99)+1}
+      const table=document.createElement('table'); table.border='1'; table.style.borderCollapse='collapse'; const tb=document.createElement('tbody');
+      let cols=4, rows=12, sums=Array(cols).fill(0), vals=[];
+      for(let i=0;i<rows;i++){ const tr=document.createElement('tr'); let row=[]; for(let j=0;j<cols;j++){ const v=rnd(); row.push(v); sums[j]+=v; const td=document.createElement('td'); td.textContent=v; td.style.padding='4px 8px'; tr.appendChild(td);} vals.push(row); tb.appendChild(tr); }
+      table.appendChild(tb); document.body.appendChild(table);
+      function stats(col){ const arr=vals.map(r=>r[col]); const mean=arr.reduce((a,b)=>a+b,0)/arr.length; const sd=Math.sqrt(arr.reduce((s,x)=>s+(x-mean)**2,0)/arr.length); return {mean,sd}; }
+      const pre=document.createElement('pre'); for(let j=0;j<cols;j++){ const s=stats(j); pre.textContent += "عمود "+(j+1)+": المتوسط="+s.mean.toFixed(2)+", الانحراف="+s.sd.toFixed(2)+"\\n"; } document.body.appendChild(pre);
+    `;
+    logAct("تم اختيار قالب الجدول والإحصاء.");
+  }else if(lower.includes("فيبوناتشي")||lower.includes("fibo")){
+    code = `
+      const arr=[0,1]; while(arr[arr.length-1] <= 10000){ arr.push(arr[arr.length-1]+arr[arr.length-2]); }
+      const pre=document.createElement('pre'); pre.textContent = "السلسلة: "+arr.join(", ")+"\\nالطول: "+arr.length; document.body.appendChild(pre);
+    `;
+    logAct("توليد متتالية فيبوناتشي.");
+  }else{
+    // generic summarizer/calculator
+    if(/[0-9+\-*/()]/.test(task) && !task.includes("\n")){
+      try{ const r = Function("return ("+task+")")(); print("النتيجة الحسابية: "+r); }
+      catch(e){ print("تعذر تقييم التعبير."); }
+      return;
+    }else{
+      print("لا يوجد قالب مطابق. اكتب طلبًا يحتوي على 'Canvas' أو 'جدول' أو 'فيبوناتشي'، أو تعبير حسابي بسيط.");
+      return;
+    }
+  }
+  // run inside sandboxed iframe
+  const doc = box.contentDocument;
+  doc.open(); 
+  doc.write("<!doctype html><html><head><meta charset='utf-8'><style>body{font:14px system-ui;padding:10px}</style></head><body><script>"+code.replace(/<\/script>/g,"<\\/script>")+"</script></body></html>");
+  doc.close();
+  print("تم التنفيذ داخل صندوق آمن.");
+}
+
+// --- Memory modal (very simple) ---
+function showMemory(){
+  const data = JSON.stringify(state.memory, null, 2);
+  const txt = prompt("الذاكرة الحالية (حرّر JSON لحفظه):", data);
+  if(txt!=null){
+    try{ state.memory = JSON.parse(txt); save(); alert("تم الحفظ."); }
+    catch(e){ alert("JSON غير صالح."); }
+  }
+}
+
+function exportAll(){
+  const blob = new Blob([JSON.stringify({memory:state.memory,history:state.history}, null, 2)], {type:"application/json"});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = "miniagi_data.json";
+  a.click();
+}
+
+function hardReset(){
+  if(confirm("مسح كل شيء؟")){ localStorage.clear(); state.memory=[]; state.history=[]; planEl.innerHTML=""; actEl.innerHTML=""; outEl.textContent=""; box.srcdoc=""; alert("تم المسح."); }
+}
+
+// --- Events ---
+$("#btnRun").addEventListener("click", ()=>{ const t=$("#task").value.trim(); if(!t){ alert("اكتب مهمة أولاً"); return;} plan(t); run(t); state.history.push({t, ts:Date.now()}); save(); });
+$("#task").addEventListener("keydown", (e)=>{ if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); $("#btnRun").click(); }});
+$("#btnTemplates").addEventListener("click", ()=>{
+  const list = templates.map((t,i)=>`${i+1}. ${t.title}`).join("\\n");
+  const pick = prompt("اختر رقم القالب:\\n"+list);
+  const idx = (+pick||0)-1;
+  if(templates[idx]){ $("#task").value = templates[idx].prompt; }
+});
+$("#btnMemory").addEventListener("click", showMemory);
+$("#btnExport").addEventListener("click", exportAll);
+$("#btnReset").addEventListener("click", hardReset);
+
+// initial
+print("جاهز. اكتب مهمة ثم اضغط شغّل.");
+</script>
+</body>
+</html>
